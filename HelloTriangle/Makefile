@@ -2,7 +2,7 @@ CFLAGS = -std=c++17 -O2
 LDFLAGS = -lglfw -lvulkan
 
 HelloTriangle: main.cpp
-	g++ $(CFLAGS) -o HelloTriangle main.cpp $(LDFLAGS)
+	g++ $(CFLAGS) -o HelloTriangle -g main.cpp $(LDFLAGS)
 
 .PHONY: test clean
 
