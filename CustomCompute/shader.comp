@@ -1,0 +1,21 @@
+#version 450
+
+layout (local_size_x = 1024) in; // This is the workgroup size
+
+layout(binding = 0) readonly buffer InBuffer
+{
+    int inBuffer[];
+};
+
+layout(binding = 1) buffer OutBuffer
+{
+    int outBuffer[];
+};
+
+void main() {
+    outBuffer[gl_GlobalInvocationID.x].x = inBuffer[gl_GlobalInvocationID.x].x * 2;
+    // outBuffer[gl_GlobalInvocationID.y].y = inBuffer[gl_GlobalInvocationID.y].y * 2;
+    // outBuffer[gl_GlobalInvocationID.z].z = inBuffer[gl_GlobalInvocationID.z].z * 2;
+    // outBuffer[storePos].x = val * 2;
+    // outBuffer[storePos].x = val * 2;
+}
