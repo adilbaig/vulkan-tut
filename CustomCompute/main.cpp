@@ -187,9 +187,9 @@ int main()
                                {DescriptorSet},                 // List of descriptor sets
                                {});                             // Dynamic offsets
   
-  uint dispatchSize = (NumElements/1024) + 1; // layout (local_size_x = 512) in;  in the shader file
+  uint dispatchSize = (NumElements/DeviceLimits.maxComputeWorkGroupSize[0]) + 1; // layout (local_size_x = 1024) in;  in the shader file
   std::cout << "Dispatch Size: " << dispatchSize << std::endl;
-  CmdBuffer.dispatch(1024, 1, 1);
+  CmdBuffer.dispatch(dispatchSize, 1, 1);
   CmdBuffer.end();
 
   // Submit commands to the queue, setup a fence, and wait for the fenc to complete
@@ -209,11 +209,11 @@ int main()
   // Print out the results!
   InBufferPtr = static_cast<int32_t *>(Device.mapMemory(InBufferMemory, 0, BufferSize));
   int32_t *OutBufferPtr = static_cast<int32_t *>(Device.mapMemory(OutBufferMemory, 0, BufferSize));
-  // for (uint32_t I = 0; I < NumElements; ++I)
-  // {
-  //   std::cout << InBufferPtr[I] << "(" << OutBufferPtr[I] << ")\n";
-  // }
-  // std::cout << std::endl;
+  for (uint32_t I = NumElements-100; I < NumElements; ++I)
+  {
+    std::cout << InBufferPtr[I] << "(" << OutBufferPtr[I] << ")\n";
+  }
+  std::cout << std::endl;
   Device.unmapMemory(InBufferMemory);
   Device.unmapMemory(OutBufferMemory);
 

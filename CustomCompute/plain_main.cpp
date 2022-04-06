@@ -19,11 +19,11 @@ int main()
   }
 
   // Sssh!
-  // for (uint32_t I = 0; I < NumElements; ++I)
-  // {
-  //   std::cout << InBuffer[I] << "(" << OutBuffer[I] << ")\n";
-  // }
-  // std::cout << std::endl;
+  for (uint32_t I = NumElements-100; I < NumElements; ++I)
+  {
+    std::cout << InBuffer[I] << "(" << OutBuffer[I] << ")\n";
+  }
+  std::cout << std::endl;
 
   return EXIT_SUCCESS;
 }
