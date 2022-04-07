@@ -30,3 +30,8 @@ add_executable(CustomCompute "main.cpp")
 target_link_libraries(CustomCompute PRIVATE Vulkan::Vulkan)
 add_dependencies(CustomCompute ComputeShaderGLSL)
 # add_dependencies(CustomCompute ComputeShaderHLSL)
+
+
+project(CppBenchmark)
+add_executable(CppBenchmark "plain_main.cpp")
+target_link_libraries(CppBenchmark PRIVATE pthread)
