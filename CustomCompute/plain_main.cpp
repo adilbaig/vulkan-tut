@@ -4,7 +4,7 @@
 #include <thread>
 
 const auto n =  std::thread::hardware_concurrency();
-const uint32_t NumElements = 1000 * 1000000;
+const uint32_t NumElements = 300 * 1000000;
 std::vector<uint32_t> InBuffer(NumElements);
 std::vector<uint32_t> OutBuffer(NumElements);
 
