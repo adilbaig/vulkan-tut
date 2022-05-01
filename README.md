@@ -20,3 +20,14 @@ Run
 cmake -S HelloTriangle/ -B build && cmake --build build
 ./build/bin/HelloTriangle 
 ```
+
+## CustomCompute
+
+An experiment with Compute Shaders and benchmark them against GPUs
+
+```bash
+cd CustomCompute
+cmake -S . -B build && cmake --build build
+time ./build/bin/CustomCompute
+time ./build/bin/CppBenchmark
+```
