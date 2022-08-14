@@ -7,8 +7,9 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <tuple>
 
-const uint32_t NumElements = 300 * 1000000; 
+const uint32_t NumElements = 310 * 1000000; 
 const std::string shaderFile("/home/adil/workspace/vulkan-tut/CustomCompute/build/bin/compute.spv");
 
 static std::vector<char> readFile(const std::string &filename)
@@ -29,26 +30,17 @@ static std::vector<char> readFile(const std::string &filename)
   return buffer;
 }
 
-int main()
+vk::Instance initVulkanInstance() 
 {
   vk::ApplicationInfo AppInfo{"VulkanCustomCompute", 1, nullptr, 0, VK_API_VERSION_1_2};
   const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
 
   vk::InstanceCreateInfo InstanceCreateInfo(vk::InstanceCreateFlags(), &AppInfo, validationLayers.size(), validationLayers.data());
-  vk::Instance Instance = vk::createInstance(InstanceCreateInfo);
+  return vk::createInstance(InstanceCreateInfo);
+}
 
-  // We're just taking the first device we find (`front()`)
-  auto pDevice = Instance.enumeratePhysicalDevices().front();
-  auto pDeviceProps = pDevice.getProperties();
-
-  std::cout << "Device Name: " << pDeviceProps.deviceName << std::endl;
-
-  const auto ApiVersion = pDeviceProps.apiVersion;
-  std::cout << "Vulkan Version : " << VK_VERSION_MAJOR(ApiVersion) << "." << VK_VERSION_MINOR(ApiVersion) << "." << VK_VERSION_PATCH(ApiVersion) << std::endl;
-  auto DeviceLimits = pDeviceProps.limits;
-  std::cout << "Max Compute Shared Memory Size: " << DeviceLimits.maxComputeSharedMemorySize / 1024 << " KB" << std::endl;
-  std::cout << "Max WorkGroup Size: " << DeviceLimits.maxComputeWorkGroupSize[0] << " " << DeviceLimits.maxComputeWorkGroupSize[1] << " " << DeviceLimits.maxComputeWorkGroupSize[2] << std::endl;
-
+std::tuple<vk::Device, uint32_t> initComputeDevice(vk::PhysicalDevice &pDevice)
+{
   // Now look for a Queue that supports `vk::QueueFlagBits::eCompute` (VK_QUEUE_COMPUTE_BIT) ...
   std::vector<vk::QueueFamilyProperties> QueueFamilyProps = pDevice.getQueueFamilyProperties();
   auto PropIt = std::find_if(QueueFamilyProps.begin(), QueueFamilyProps.end(), [](const vk::QueueFamilyProperties &Prop)
@@ -63,21 +55,14 @@ int main()
   float queuePriorities[noOfQueues] = {1.0};
   vk::DeviceQueueCreateInfo DeviceQueueCreateInfo(vk::DeviceQueueCreateFlags(), ComputeQueueFamilyIndex, noOfQueues, &queuePriorities[0]);
   vk::DeviceCreateInfo DeviceCreateInfo(vk::DeviceCreateFlags(), DeviceQueueCreateInfo);
-  vk::Device Device = pDevice.createDevice(DeviceCreateInfo);
+  return {pDevice.createDevice(DeviceCreateInfo), ComputeQueueFamilyIndex};
+}
 
-  // Create Buffers (which is a view into memory, not actually storing data)
-  const uint32_t BufferSize = sizeof(int32_t) * NumElements;
-
-  vk::BufferCreateInfo BufferCreateInfo{
-      vk::BufferCreateFlags(),
-      BufferSize,
-      vk::BufferUsageFlagBits::eStorageBuffer, // Usage
-      vk::SharingMode::eExclusive,             // Sharing mode
-      1,                                       // Number of queue family indices
-      &ComputeQueueFamilyIndex                 // List of Queue family indices
-  };
-  vk::Buffer InBuffer = Device.createBuffer(BufferCreateInfo);
-  vk::Buffer OutBuffer = Device.createBuffer(BufferCreateInfo);
+uint32_t getHostMappableMemoryIndex(vk::PhysicalDevice &pDevice)
+{
+  /*
+   * Find memory that can be mapped from GPU to the host
+   */
 
   vk::PhysicalDeviceMemoryProperties MemoryProperties = pDevice.getMemoryProperties();
   uint32_t MemoryTypeIndex = uint32_t(~0);
@@ -95,27 +80,74 @@ int main()
     }
   }
 
+  std::cout << "Memory Heap Size : " << MemoryHeapSize / 1024 / 1024 << " MB" << std::endl;
+
+  return MemoryTypeIndex;
+}
+
+int main()
+{
+  vk::Instance Instance = initVulkanInstance();
+
+  // We're just taking the first device we find (`front()`)
+  auto pDevice = Instance.enumeratePhysicalDevices().front();
+  auto [Device, ComputeQueueFamilyIndex] = initComputeDevice(pDevice);
+
+  auto pDeviceProps = pDevice.getProperties();
+  const auto ApiVersion = pDeviceProps.apiVersion;
+  auto DeviceLimits = pDeviceProps.limits;
+
+  std::cout << "Device Name: " << pDeviceProps.deviceName << std::endl;
+  std::cout << "Vulkan Version : " << VK_VERSION_MAJOR(ApiVersion) << "." << VK_VERSION_MINOR(ApiVersion) << "." << VK_VERSION_PATCH(ApiVersion) << std::endl;
+  std::cout << "Max Compute Shared Memory Size: " << DeviceLimits.maxComputeSharedMemorySize / 1024 << " KB" << std::endl;
+  std::cout << "Max WorkGroup Size: " << DeviceLimits.maxComputeWorkGroupSize[0] << " " << DeviceLimits.maxComputeWorkGroupSize[1] << " " << DeviceLimits.maxComputeWorkGroupSize[2] << std::endl;
+
+  // ---------------------------
+  //  MEMORY ALLOCATION START
+  // ---------------------------
+
+  // Create Buffers (which is a view into memory, and does not actually store data)
+  const uint32_t BufferSizeBytes = sizeof(uint32_t) * NumElements;
+  
+  vk::BufferCreateInfo BufferCreateInfo{
+      vk::BufferCreateFlags(),
+      BufferSizeBytes,
+      vk::BufferUsageFlagBits::eStorageBuffer, // Usage
+      vk::SharingMode::eExclusive,             // Sharing mode
+      1,                                       // Number of queue family indices
+      &ComputeQueueFamilyIndex                 // List of Queue family indices
+  };
+  vk::Buffer InBuffer = Device.createBuffer(BufferCreateInfo);
+  vk::Buffer OutBuffer = Device.createBuffer(BufferCreateInfo);
+
+  // Query for memory type that can be mapped from device to host
+  auto MemoryTypeIndex = getHostMappableMemoryIndex(pDevice);
+
   std::cout << "Memory Type Index: " << MemoryTypeIndex << std::endl;
-  std::cout << "Memory Heap Size : " << MemoryHeapSize / 1024 / 1024 / 1024 << " GB" << std::endl;
+  std::cout << "Buffer Size: " << BufferSizeBytes / 1024 / 1024 << " MB" << std::endl;
 
-  vk::MemoryRequirements InBufferMemoryRequirements = Device.getBufferMemoryRequirements(InBuffer);
-  vk::MemoryRequirements OutBufferMemoryRequirements = Device.getBufferMemoryRequirements(OutBuffer);
-
-  vk::MemoryAllocateInfo InBufferMemoryAllocateInfo(InBufferMemoryRequirements.size, MemoryTypeIndex);
-  vk::MemoryAllocateInfo OutBufferMemoryAllocateInfo(OutBufferMemoryRequirements.size, MemoryTypeIndex);
+  // Ask the device to allocate the required memory for our buffers:
+  vk::MemoryAllocateInfo InBufferMemoryAllocateInfo(BufferSizeBytes, MemoryTypeIndex);
+  vk::MemoryAllocateInfo OutBufferMemoryAllocateInfo(BufferSizeBytes, MemoryTypeIndex);
   vk::DeviceMemory InBufferMemory = Device.allocateMemory(InBufferMemoryAllocateInfo);
   vk::DeviceMemory OutBufferMemory = Device.allocateMemory(InBufferMemoryAllocateInfo);
 
-  int32_t *InBufferPtr = static_cast<int32_t *>(Device.mapMemory(InBufferMemory, 0, BufferSize));
-  for (int32_t I = 0; I < NumElements; ++I)
+  // The last step of the memory allocation part is to get a mapped pointer to this memory 
+  // that can be used to copy data from the host to the device. Here, I am just setting the value to an autoinc counter
+  int32_t* InBufferPtr = static_cast<int32_t*>(Device.mapMemory(InBufferMemory, 0, BufferSizeBytes));
+  for (uint32_t I = 0; I < NumElements; ++I)
   {
-    InBufferPtr[I] = I;
+    InBufferPtr[I] = I + 1;
   }
   Device.unmapMemory(InBufferMemory);
 
   // Binding the buffer to memory is what lets the GPU RW into the buffers.
   Device.bindBufferMemory(InBuffer, InBufferMemory, 0);
   Device.bindBufferMemory(OutBuffer, OutBufferMemory, 0);
+
+  // ---------------------------
+  //  MEMORY ALLOCATION END
+  // ---------------------------
 
   // Now read the compute shader
   std::vector<char> ShaderContents = readFile(shaderFile);
@@ -192,7 +224,7 @@ int main()
   CmdBuffer.dispatch(dispatchSize, 1, 1);
   CmdBuffer.end();
 
-  // Submit commands to the queue, setup a fence, and wait for the fenc to complete
+  // Submit commands to the queue, setup a fence, and wait for the fence to complete
   vk::Queue Queue = Device.getQueue(ComputeQueueFamilyIndex, 0);
   vk::Fence Fence = Device.createFence(vk::FenceCreateInfo());
 
@@ -207,9 +239,9 @@ int main()
                        uint64_t(-1)); // Timeout
 
   // Print out the results!
-  InBufferPtr = static_cast<int32_t *>(Device.mapMemory(InBufferMemory, 0, BufferSize));
-  int32_t *OutBufferPtr = static_cast<int32_t *>(Device.mapMemory(OutBufferMemory, 0, BufferSize));
-  for (uint32_t I = NumElements-100; I < NumElements; ++I)
+  InBufferPtr = static_cast<int32_t *>(Device.mapMemory(InBufferMemory, 0, BufferSizeBytes));
+  int32_t *OutBufferPtr = static_cast<int32_t *>(Device.mapMemory(OutBufferMemory, 0, BufferSizeBytes));
+  for (uint32_t I = NumElements-5; I < NumElements; ++I)
   {
     std::cout << InBufferPtr[I] << "(" << OutBufferPtr[I] << ")\n";
   }
