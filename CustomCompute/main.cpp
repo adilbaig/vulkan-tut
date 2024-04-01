@@ -180,7 +180,9 @@ int main()
       vk::PipelineCreateFlags(), // Flags
       PipelineShaderCreateInfo,  // Shader Create Info struct
       PipelineLayout);           // Pipeline Layout
-  vk::Pipeline ComputePipeline = Device.createComputePipeline(PipelineCache, ComputePipelineCreateInfo);
+  
+  vk::ResultValue<vk::Pipeline> results = Device.createComputePipeline(PipelineCache, ComputePipelineCreateInfo);
+  vk::Pipeline ComputePipeline = results.value;
 
   // Back to creating Descriptor Sets
   vk::DescriptorPoolSize DescriptorPoolSize(vk::DescriptorType::eStorageBuffer, 2);
@@ -219,9 +221,12 @@ int main()
                                {DescriptorSet},                 // List of descriptor sets
                                {});                             // Dynamic offsets
   
-  uint dispatchSize = (NumElements/DeviceLimits.maxComputeWorkGroupSize[0]) + 1; // layout (local_size_x = 1024) in;  in the shader file
-  std::cout << "Dispatch Size: " << dispatchSize << std::endl;
-  CmdBuffer.dispatch(dispatchSize, 1, 1);
+  uint groupCountX = (NumElements/DeviceLimits.maxComputeWorkGroupSize[0]) + 1; // layout (local_size_x = 1024) in;  in the shader file
+  uint groupCountY = 1;
+  uint groupCountZ = 1;
+  std::cout << "Dispatch Size: " << groupCountX << "," << groupCountY << "," << groupCountZ << std::endl;
+  std::cout << "Dispatch Size (Max): " << DeviceLimits.maxComputeWorkGroupCount[0] << "," << DeviceLimits.maxComputeWorkGroupCount[1] << "," << DeviceLimits.maxComputeWorkGroupCount[2] << std::endl;
+  CmdBuffer.dispatch(groupCountX, groupCountY, groupCountZ);
   CmdBuffer.end();
 
   // Submit commands to the queue, setup a fence, and wait for the fence to complete
